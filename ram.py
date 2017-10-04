@@ -12,7 +12,7 @@ class RAMLoad:
         """
         self.initial_ram_usage = psutil.virtual_memory().percent
         self.desired_load_average_percentage = desired_load_average_percentage
-        self.mem_hog = None
+        self.mem_hog = ''
         self.percent_displacement = None
 
     def get_current_memory_utilization(self):
@@ -32,10 +32,9 @@ class RAMLoad:
             print(self.get_current_memory_utilization().percent)
             # if current ram use is less than desired, find/calculate buffer - store var
             if self.get_current_memory_utilization().percent < self.desired_load_average_percentage:
-                del self.mem_hog
                 self.percentage_displacement = self.desired_load_average_percentage - self.get_current_memory_utilization().percent
                 bytes_to_ram_load = int(self.get_current_memory_utilization().total * (self.percentage_displacement / 100))
-                self.mem_hog = 'a' * bytes_to_ram_load
+                self.mem_hog += 'a' * bytes_to_ram_load
                 logging.info('var created')
 
             # if current ram use is over desired - remove variable and see if we can do anything about it
