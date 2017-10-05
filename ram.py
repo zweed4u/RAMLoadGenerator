@@ -1,19 +1,20 @@
-import sys
-import time
 import psutil
 import logging
+import threading
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-class RAMLoad:
+class RAMLoad(threading.Thread):
     def __init__(self, desired_load_average_percentage: int):
         """
         :param desired_load_average_percentage: the input from apogee config - ram usage average (0.0 - 100.0)
         """
+        super().__init__()
+        self.daemon = True
+        self.running = True
         self.initial_ram_usage = psutil.virtual_memory().percent
         self.desired_load_average_percentage = desired_load_average_percentage
         self.mem_hog = ''
         self.percent_displacement = None
+        self.start()
 
     def get_current_memory_utilization(self):
         """
@@ -22,39 +23,42 @@ class RAMLoad:
         """
         return psutil.virtual_memory()
 
-    def load(self):
+    def calculate_buffer_bytes(self):
+        """
+        Used to calculate the needed number of bytes to fill RAM to specifications
+        :return: int - number of bytes
+        """
+        self.percentage_displacement = self.desired_load_average_percentage - self.get_current_memory_utilization().percent
+        bytes_to_ram_load = int(self.get_current_memory_utilization().total * (self.percentage_displacement / 100))
+        return bytes_to_ram_load
+
+    def run(self):
         """
         Declare long string to chew up memory - calculated
         :return:
         """
-        # big loop just for now
-        while 1:
-            print(self.get_current_memory_utilization().percent)
-            # if current ram use is less than desired, find/calculate buffer - store var
+        while self.running:
             if self.get_current_memory_utilization().percent < self.desired_load_average_percentage:
-                self.percentage_displacement = self.desired_load_average_percentage - self.get_current_memory_utilization().percent
-                bytes_to_ram_load = int(self.get_current_memory_utilization().total * (self.percentage_displacement / 100))
-                self.mem_hog += 'a' * bytes_to_ram_load
-                logging.info('var created')
+                logging.info('RAM usage is below desired load - adjusting variable')
+                self.mem_hog += 'a' * self.calculate_buffer_bytes()
 
-            # if current ram use is over desired - remove variable and see if we can do anything about it
             elif self.get_current_memory_utilization().percent > self.desired_load_average_percentage:
-                logging.info('RAM load is already higher than provided - removing variable')
+                logging.info('RAM load is higher than desired - removing variable')
                 self.free()
-                # check if we can hit desired use by subtracting our original variable
                 if self.get_current_memory_utilization().percent > self.desired_load_average_percentage:
                     logging.info('Even with variable deleted RAM usage is above specification')
                 else:
                     logging.info('Resizing variable could result in desire RAM usage - resizing')
-                    self.percentage_displacement = self.desired_load_average_percentage - self.get_current_memory_utilization().percent
-                    bytes_to_ram_load = int(self.get_current_memory_utilization().total * (self.percentage_displacement / 100))
-                    self.mem_hog = 'a' * bytes_to_ram_load
+                    self.mem_hog = 'a' * self.calculate_buffer_bytes()
 
             else:
                 logging.info('System memory load conditions have been met')
-            time.sleep(5)
 
     def free(self):
+        """
+        Delete the variable that is used to take up space
+        :return:
+        """
         del self.mem_hog
 
-t=RAMLoad(float(sys.argv[-1])).load()
+RAMLoad(33.3)
